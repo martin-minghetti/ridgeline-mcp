@@ -26,3 +26,4 @@ td { border-bottom: 1px solid var(--line); padding: 10px 8px 10px 0; vertical-al
 td.access { color: var(--muted); white-space: nowrap; }
 footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 20px; color: var(--muted); font-size: 14px; }
 @media (max-width: 560px) { tr { display: block; border-bottom: 1px solid var(--line); padding: 8px 0; } td { display: block; border: 0; padding: 2px 0; } }
+pre.cmd { white-space: pre; overflow-x: auto; word-break: normal; user-select: text; font-size: 13px; }

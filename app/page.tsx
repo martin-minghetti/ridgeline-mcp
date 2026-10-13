@@ -57,7 +57,7 @@ export default function Home() {
         </ol>
         <p className="note">The Free plan allows one custom connector. This key is read-only: the write tool answers with a permission error.</p>
         <p>Claude Code:</p>
-        <pre>{`claude mcp add --transport http ridgeline ${url} \\\n  --header "Authorization: ${header}"`}</pre>
+        <pre className="cmd">{`claude mcp add --transport http ridgeline ${url} \\\n  --header "Authorization: ${header}"`}</pre>
       </section>
 
       <section>
