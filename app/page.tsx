@@ -41,7 +41,7 @@ export default function Home() {
           {QUESTIONS.map((q) => <li key={q}>“{q}”</li>)}
         </ul>
         <figure>
-          <img src="/claude-answer.png" width={1498} height={1564} alt="Claude in claude.ai answering “Which invoices are overdue and what should we reorder?” with a table of 13 overdue invoices" />
+          <img className="tall" src="/claude-answer.png" width={1170} height={2000} alt="Claude in claude.ai answering “Which invoices are overdue and what should we reorder?” with a table of 13 overdue invoices" />
           <figcaption>A real answer in claude.ai, using this server.</figcaption>
         </figure>
       </section>
