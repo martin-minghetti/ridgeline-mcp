@@ -20,6 +20,8 @@ claude mcp add --transport http ridgeline-demo https://ridgeline-mcp.vercel.app/
 
 ## Example questions
 
+![Claude (claude.ai custom connector) answering "Which invoices are overdue and what should we reorder?"](docs/claude-answer.png)
+
 - What's the status of order 1042?
 - Which invoices are overdue?
 - What do we need to reorder?
@@ -29,7 +31,7 @@ With the operator key you can also ask for a follow-up task for a customer. Clau
 
 ![Approval page after clicking Approve](docs/approval-page.png)
 
-Sample of a Claude Code answer from a live run (translated and shortened):
+Sample of a Claude Code answer from a live run that also requested a follow-up task (translated and shortened):
 
 > 13 invoices are overdue, $7,823.50 in total. The most overdue customer is Granite Peak Mining (4 invoices, oldest 40 days).
 > 5 products are at or below reorder point, biggest shortfall first: Hard hat (RS-130), Safety goggles (RS-110), First aid kit (RS-160).
@@ -70,7 +72,7 @@ Vercel Hobby or Pro function invocations only. No database, and no LLM calls on 
 
 ## Compatibility
 
-Tested with Claude Code. The claude.ai custom connector uses the same URL and a request header, but this has not yet been verified in the claude.ai UI. It uses standard MCP over Streamable HTTP. ChatGPT supports custom MCP apps on Business, Enterprise and Edu plans (not tested here).
+Tested with Claude (claude.ai custom connector, "No sign-in" plus an `Authorization` request header) and Claude Code. In claude.ai the four read tools show up as read-only and `request_follow_up_task` as a write tool, so you can allow reads and keep writes on "Needs approval". It uses standard MCP over Streamable HTTP. ChatGPT supports custom MCP apps on Business, Enterprise and Edu plans (not tested here).
 
 ## Run locally
 
