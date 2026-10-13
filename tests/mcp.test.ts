@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 
 const READ = "r".repeat(24), WRITE = "w".repeat(24);
 beforeAll(() => {
@@ -80,6 +80,38 @@ describe("tools", () => {
         expect(textOf(r)).toBe("Server is not configured for approvals.");
         expect(textOf(r)).not.toContain("/approve?t=");
       }
-    } finally { process.env.APPROVAL_SECRET = saved; }
+    } finally { if (saved === undefined) delete process.env.APPROVAL_SECRET; else process.env.APPROVAL_SECRET = saved; }
+  });
+  it("fails closed when PUBLIC_BASE_URL is unset", async () => {
+    const saved = process.env.PUBLIC_BASE_URL;
+    try {
+      delete process.env.PUBLIC_BASE_URL;
+      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2026-10-20" }, WRITE);
+      expect(r.json.result.isError).toBe(true);
+      expect(textOf(r)).toBe("Server is not configured for approvals.");
+    } finally { if (saved === undefined) delete process.env.PUBLIC_BASE_URL; else process.env.PUBLIC_BASE_URL = saved; }
+  });
+  it("strips a trailing slash from PUBLIC_BASE_URL", async () => {
+    const saved = process.env.PUBLIC_BASE_URL;
+    try {
+      process.env.PUBLIC_BASE_URL = "https://demo.test/";
+      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2026-10-20" }, WRITE);
+      expect(textOf(r)).toContain("https://demo.test/approve?t=");
+    } finally { process.env.PUBLIC_BASE_URL = saved; }
+  });
+  it("rejects impossible calendar dates", async () => {
+    const r = await call("sales_summary", { from: "2026-02-31", to: "2026-03-05" });
+    expect(r.json.result?.isError ?? true).toBe(true);
+    expect(JSON.stringify(r.json)).not.toContain("revenue.");
+  });
+  it("log line has noteLength, not the note text", async () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await call("request_follow_up_task", { customerId: "C-02", note: "SECRET-NOTE-TEXT", dueDate: "2026-10-20" }, WRITE);
+      const lines = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("mcp_tool_call"));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('"noteLength":16');
+      expect(lines[0]).not.toContain("SECRET-NOTE-TEXT");
+    } finally { spy.mockRestore(); }
   });
 });

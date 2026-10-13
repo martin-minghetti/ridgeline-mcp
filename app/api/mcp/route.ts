@@ -10,16 +10,22 @@ type Ctx = { http?: { authInfo?: { clientId?: string; scopes?: string[] } } };
 const text = (t: string, isError = false) => ({ content: [{ type: "text" as const, text: t }], ...(isError ? { isError: true } : {}) });
 
 // One structured line per tool call: in a client project this feeds their log store / audit trail.
-function logged<A>(tool: string, fn: (args: A, ctx: Ctx) => ReturnType<typeof text>) {
+function logged<A>(tool: string, fn: (args: A, ctx: Ctx) => ReturnType<typeof text>, redact: (args: A) => object = (a) => a as object) {
   return async (args: A, ctx: Ctx) => {
     const t0 = Date.now();
-    const result = fn(args, ctx);
-    console.log(JSON.stringify({ type: "mcp_tool_call", tool, client: ctx?.http?.authInfo?.clientId ?? "unknown", args, isError: !!result.isError, ms: Date.now() - t0 }));
-    return result;
+    let isError = true;
+    try {
+      const result = fn(args, ctx);
+      isError = !!result.isError;
+      return result;
+    } finally {
+      console.log(JSON.stringify({ type: "mcp_tool_call", tool, client: ctx?.http?.authInfo?.clientId ?? "unknown", args: redact(args), isError, ms: Date.now() - t0 }));
+    }
   };
 }
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine((s) => { const d = new Date(`${s}T00:00:00Z`); return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; }, "Not a real calendar date");
 
 const handler = createMcpHandler((server) => {
   server.registerTool("find_order", {
@@ -89,15 +95,16 @@ const handler = createMcpHandler((server) => {
     const auth = ctx?.http?.authInfo;
     if (!auth?.scopes?.includes("erp:write")) return text("This key is read-only. Use the operator key to request write actions.", true);
     const secret = process.env.APPROVAL_SECRET;
-    if (!secret || secret.length < 32) return text("Server is not configured for approvals.", true);
+    const baseUrl = (process.env.PUBLIC_BASE_URL ?? "").trim().replace(/\/+$/, "");
+    if (!secret || secret.length < 32 || !baseUrl) return text("Server is not configured for approvals.", true);
     const customer = CUSTOMERS.find((c) => c.id === customerId);
     if (!customer) return text(`Customer ${customerId} not found.`, true);
     const token = signApproval({ customerId, customerName: customer.name, note, dueDate, requestedBy: auth.clientId ?? "unknown" }, secret);
     return text([
       `Follow-up task for ${customer.name} due ${dueDate} is waiting for approval. Not executed yet.`,
-      `A person must approve it here (link valid 24 h): ${process.env.PUBLIC_BASE_URL}/approve?t=${token}`,
+      `A person must approve it here (link valid 24 h): ${baseUrl}/approve?t=${token}`,
     ].join("\n"));
-  }));
+  }, ({ customerId, note, dueDate }) => ({ customerId, dueDate, noteLength: note.length })));
 }, { serverInfo: { name: "ridgeline-supply-demo", version: "1.0.0" } });
 
 const authed = withMcpAuth(handler, verifyKey, { required: true });
