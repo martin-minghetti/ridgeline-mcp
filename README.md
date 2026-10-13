@@ -6,9 +6,10 @@ An MCP server that connects Claude to a (fictional) distributor's back office: o
 
 - Server URL: `https://ridgeline-mcp.vercel.app/api/mcp`
 - Public read key: `80248ebd3dd358e7eb8605ad4d2ab7c6`
-- Operator key (needed for `request_follow_up_task`): on request.
+- Operator key (needed for `request_follow_up_task`): open an issue on this repo.
+- The read key gets a read-only error on `request_follow_up_task`; the operator key can also read. Opening the server URL in a browser returns 401, because it is an API endpoint, not a page.
 
-**Claude:** Settings, Connectors, Add custom connector, paste the server URL, open Advanced and add the request header `Authorization: Bearer <key>`. On Claude's Free plan you can add one custom connector.
+**Claude:** Settings, Connectors, Add custom connector, paste the server URL. Set authentication to "No sign in" and, in the connector's "Request headers" section, add the header `Authorization` with value `Bearer <key>` (see Anthropic's help article "Getting started with custom connectors using remote MCP"). On Claude's Free plan you can add one custom connector.
 
 **Claude Code:**
 
@@ -26,7 +27,13 @@ claude mcp add --transport http ridgeline-demo https://ridgeline-mcp.vercel.app/
 
 With the operator key you can also ask for a follow-up task for a customer. Claude gets back an approval link; nothing is written until a person opens it and approves.
 
-![Approval page after clicking Approve](docs/claude-answer.png)
+![Approval page after clicking Approve](docs/approval-page.png)
+
+Sample of a Claude Code answer from a live run (translated and shortened):
+
+> 13 invoices are overdue, $7,823.50 in total. The most overdue customer is Granite Peak Mining (4 invoices, oldest 40 days).
+> 5 products are at or below reorder point, biggest shortfall first: Hard hat (RS-130), Safety goggles (RS-110), First aid kit (RS-160).
+> The follow-up task is not created yet: someone has to approve it at the link below, which expires in 24 hours.
 
 ## Tools
 
@@ -48,7 +55,7 @@ A Next.js route (`app/api/mcp/route.ts`) using `mcp-handler`. `lib/erp.ts` stand
 - Validated inputs on every tool.
 - Separate read and write keys.
 - Writes go through a signed approval link that expires after 24 hours. The approval page states that in a real deployment it sits behind the company login and records who approved. In this demo the link is a bearer link: anyone holding it can approve, and approving writes nothing.
-- One structured log line per tool call.
+- One structured log line per tool call. Free-text notes are redacted from it; only their length is logged.
 - No raw SQL.
 
 ## Adapting it to a real system
@@ -63,7 +70,7 @@ Vercel Hobby or Pro function invocations only. No database, and no LLM calls on 
 
 ## Compatibility
 
-Tested with Claude (custom connector) and Claude Code. It uses standard MCP over Streamable HTTP. ChatGPT supports custom MCP apps on Business, Enterprise and Edu plans (not tested here).
+Tested with Claude Code. The claude.ai custom connector uses the same URL and a request header, but this has not yet been verified in the claude.ai UI. It uses standard MCP over Streamable HTTP. ChatGPT supports custom MCP apps on Business, Enterprise and Edu plans (not tested here).
 
 ## Run locally
 
