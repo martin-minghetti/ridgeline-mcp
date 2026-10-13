@@ -1,1 +1,7 @@
 .superpowers/
+node_modules
+.next
+.env*.local
+.vercel
+next-env.d.ts
+*.tsbuildinfo

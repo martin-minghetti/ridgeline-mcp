@@ -1,0 +1,31 @@
+{
+  "name": "ridgeline-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.2.0",
+    "mcp-handler": "2.2.0",
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
