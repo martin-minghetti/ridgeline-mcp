@@ -76,3 +76,13 @@ describe("salesSummary", () => {
 it("formats money", () => {
   expect(formatMoney(123450)).toBe("$1,234.50");
 });
+
+import { getDataset as _getDataset } from "@/lib/data";
+describe("dataset invariants", () => {
+  it("no invoice is paid after NOW", () => {
+    const NOW = new Date("2026-10-13T12:00:00Z");
+    for (const inv of _getDataset(NOW).invoices) {
+      if (inv.paidAt) expect(inv.paidAt.getTime()).toBeLessThanOrEqual(NOW.getTime());
+    }
+  });
+});

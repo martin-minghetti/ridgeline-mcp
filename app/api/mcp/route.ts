@@ -1,9 +1,10 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { findOrder, listUnpaidInvoices, listLowStock, salesSummary } from "@/lib/erp";
-import { CUSTOMERS } from "@/lib/data";
+import { CUSTOMERS, getDataset, startOfDay } from "@/lib/data";
 import { formatMoney, formatDate } from "@/lib/format";
 import { verifyKey } from "@/lib/auth";
+import { approvalSecret } from "@/lib/secret";
 import { signApproval, NOTE_MAX } from "@/lib/approval";
 
 type Ctx = { http?: { authInfo?: { clientId?: string; scopes?: string[] } } };
@@ -73,16 +74,19 @@ const handler = createMcpHandler((server) => {
 
   server.registerTool("sales_summary", {
     title: "Sales summary",
-    description: "Order count, revenue, top 3 customers and top 3 products between two dates (inclusive, max 366 days).",
+    description: "Order count, revenue, top 3 customers and top 3 products between two dates (inclusive, max 366 days). Demo data covers the last 75 days.",
     inputSchema: z.object({ from: isoDate, to: isoDate }),
     annotations: { readOnlyHint: true },
   }, logged("sales_summary", ({ from, to }: { from: string; to: string }) => {
     const r = salesSummary(new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
     if (!r.ok) return text(r.error, true);
+    const oldest = getDataset(new Date()).orders.reduce((m, o) => Math.min(m, o.createdAt.getTime()), Infinity);
+    const note = new Date(`${from}T00:00:00Z`).getTime() < oldest ? [`Note: demo data starts on ${new Date(oldest).toISOString().slice(0, 10)}.`] : [];
     return text([
       `Sales ${from} to ${to}: ${r.orderCount} order(s), ${formatMoney(r.revenueCents)} revenue.`,
       `Top customers: ${r.topCustomers.map((c) => `${c.name} (${formatMoney(c.revenueCents)})`).join(", ") || "none"}`,
       `Top products: ${r.topProducts.map((p) => `${p.name} (${p.qty} units)`).join(", ") || "none"}`,
+      ...note,
     ].join("\n"));
   }));
 
@@ -94,9 +98,16 @@ const handler = createMcpHandler((server) => {
   }, logged("request_follow_up_task", ({ customerId, note, dueDate }: { customerId: string; note: string; dueDate: string }, ctx: Ctx) => {
     const auth = ctx?.http?.authInfo;
     if (!auth?.scopes?.includes("erp:write")) return text("This key is read-only. Use the operator key to request write actions.", true);
-    const secret = process.env.APPROVAL_SECRET;
+    const secret = approvalSecret();
     const baseUrl = (process.env.PUBLIC_BASE_URL ?? "").trim().replace(/\/+$/, "");
-    if (!secret || secret.length < 32 || !baseUrl) return text("Server is not configured for approvals.", true);
+    if (!secret || !baseUrl) return text("Server is not configured for approvals.", true);
+    const today = startOfDay(new Date());
+    const max = new Date(today.getTime() + 365 * 86_400_000);
+    const due = new Date(`${dueDate}T00:00:00Z`);
+    if (due < today || due > max) {
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      return text(`dueDate must be between ${iso(today)} and ${iso(max)} (today is ${iso(today)}).`, true);
+    }
     const customer = CUSTOMERS.find((c) => c.id === customerId);
     if (!customer) return text(`Customer ${customerId} not found.`, true);
     const token = signApproval({ customerId, customerName: customer.name, note, dueDate, requestedBy: auth.clientId ?? "unknown" }, secret);

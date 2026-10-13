@@ -16,6 +16,12 @@ describe("/approve", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>alert");
     expect(html).toContain("Approve");
+    expect(html).toContain("In a real deployment this page sits behind your company login and records who approved.");
+  });
+  it("treats a repeated t param (array) as invalid instead of crashing", async () => {
+    const html = renderToStaticMarkup(await ApprovePage({ searchParams: Promise.resolve({ t: ["a", "b"] }) }));
+    expect(html).toContain("This approval link is invalid or expired");
+    expect(html).not.toContain("<button");
   });
   it("rejects a tampered link and offers no button", async () => {
     const html = renderToStaticMarkup(await ApprovePage({ searchParams: Promise.resolve({ t: "abc.def" }) }));

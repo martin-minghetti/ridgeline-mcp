@@ -6,6 +6,7 @@ beforeAll(() => {
   process.env.APPROVAL_SECRET = "s".repeat(40); process.env.PUBLIC_BASE_URL = "https://demo.test";
 });
 
+const dayOffset = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 let id = 0;
 async function rpc(method: string, params: unknown, key?: string) {
   const { POST } = await import("@/app/api/mcp/route");
@@ -57,25 +58,25 @@ describe("tools", () => {
     expect(textOf(await call("sales_summary", { from: "2026-10-10", to: "2026-10-01" }))).toContain("must be on or before");
   });
   it("read key cannot request a follow-up task", async () => {
-    const r = await call("request_follow_up_task", { customerId: "C-02", note: "Chase invoice", dueDate: "2026-10-20" });
+    const r = await call("request_follow_up_task", { customerId: "C-02", note: "Chase invoice", dueDate: dayOffset(7) });
     expect(r.json.result.isError).toBe(true);
     expect(textOf(r)).toContain("This key is read-only");
     expect(textOf(r)).not.toContain("/approve?t=");
   });
   it("write key gets an approval link, nothing is written", async () => {
-    const r = await call("request_follow_up_task", { customerId: "C-02", note: "Chase invoice", dueDate: "2026-10-20" }, WRITE);
+    const r = await call("request_follow_up_task", { customerId: "C-02", note: "Chase invoice", dueDate: dayOffset(7) }, WRITE);
     expect(textOf(r)).toContain("https://demo.test/approve?t=");
     expect(textOf(r)).toContain("Not executed yet");
   });
   it("unknown customer is rejected", async () => {
-    expect(textOf(await call("request_follow_up_task", { customerId: "C-99", note: "x", dueDate: "2026-10-20" }, WRITE))).toContain("Customer C-99 not found");
+    expect(textOf(await call("request_follow_up_task", { customerId: "C-99", note: "x", dueDate: dayOffset(7) }, WRITE))).toContain("Customer C-99 not found");
   });
   it("fails closed when APPROVAL_SECRET is missing or short", async () => {
     const saved = process.env.APPROVAL_SECRET;
     try {
       for (const bad of [undefined, "short"]) {
         if (bad === undefined) delete process.env.APPROVAL_SECRET; else process.env.APPROVAL_SECRET = bad;
-        const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2026-10-20" }, WRITE);
+        const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: dayOffset(7) }, WRITE);
         expect(r.json.result.isError).toBe(true);
         expect(textOf(r)).toBe("Server is not configured for approvals.");
         expect(textOf(r)).not.toContain("/approve?t=");
@@ -86,7 +87,7 @@ describe("tools", () => {
     const saved = process.env.PUBLIC_BASE_URL;
     try {
       delete process.env.PUBLIC_BASE_URL;
-      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2026-10-20" }, WRITE);
+      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: dayOffset(7) }, WRITE);
       expect(r.json.result.isError).toBe(true);
       expect(textOf(r)).toBe("Server is not configured for approvals.");
     } finally { if (saved === undefined) delete process.env.PUBLIC_BASE_URL; else process.env.PUBLIC_BASE_URL = saved; }
@@ -95,7 +96,7 @@ describe("tools", () => {
     const saved = process.env.PUBLIC_BASE_URL;
     try {
       process.env.PUBLIC_BASE_URL = "https://demo.test/";
-      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2026-10-20" }, WRITE);
+      const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: dayOffset(7) }, WRITE);
       expect(textOf(r)).toContain("https://demo.test/approve?t=");
     } finally { process.env.PUBLIC_BASE_URL = saved; }
   });
@@ -107,11 +108,45 @@ describe("tools", () => {
   it("log line has noteLength, not the note text", async () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
-      await call("request_follow_up_task", { customerId: "C-02", note: "SECRET-NOTE-TEXT", dueDate: "2026-10-20" }, WRITE);
+      await call("request_follow_up_task", { customerId: "C-02", note: "SECRET-NOTE-TEXT", dueDate: dayOffset(7) }, WRITE);
       const lines = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("mcp_tool_call"));
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain('"noteLength":16');
       expect(lines[0]).not.toContain("SECRET-NOTE-TEXT");
     } finally { spy.mockRestore(); }
+  });
+});
+
+describe("follow-up dueDate window", () => {
+  it("rejects a past date and issues no link", async () => {
+    const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: "2019-01-01" }, WRITE);
+    expect(r.json.result.isError).toBe(true);
+    expect(textOf(r)).toContain(`dueDate must be between ${dayOffset(0)} and ${dayOffset(365)} (today is ${dayOffset(0)}).`);
+    expect(textOf(r)).not.toContain("/approve");
+  });
+  it("rejects a date more than 365 days ahead", async () => {
+    const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: dayOffset(366) }, WRITE);
+    expect(r.json.result.isError).toBe(true);
+    expect(textOf(r)).not.toContain("/approve");
+  });
+  it("accepts tomorrow", async () => {
+    const r = await call("request_follow_up_task", { customerId: "C-02", note: "x", dueDate: dayOffset(1) }, WRITE);
+    expect(r.json.result.isError).toBeFalsy();
+    expect(textOf(r)).toContain("/approve?t=");
+  });
+});
+
+describe("sales_summary demo range", () => {
+  it("notes where demo data starts for a range in the distant past", async () => {
+    const r = await call("sales_summary", { from: "2025-01-01", to: "2025-12-31" });
+    expect(textOf(r)).toMatch(/Note: demo data starts on \d{4}-\d{2}-\d{2}\./);
+  });
+  it("adds no note when the range starts inside the data", async () => {
+    const r = await call("sales_summary", { from: dayOffset(-60), to: dayOffset(0) });
+    expect(textOf(r)).not.toContain("Note: demo data");
+  });
+  it("description mentions the 75-day coverage", async () => {
+    const r = await rpc("tools/list", {}, READ);
+    expect(r.json.result.tools.find((t: any) => t.name === "sales_summary").description).toContain("Demo data covers the last 75 days");
   });
 });

@@ -2,8 +2,9 @@ import { verifyApproval } from "@/lib/approval";
 import { approvalSecret } from "@/lib/secret";
 import ApproveForm from "./form";
 
-export default async function ApprovePage({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
-  const { t = "" } = await searchParams;
+export default async function ApprovePage({ searchParams }: { searchParams: Promise<{ t?: string | string[] }> }) {
+  const sp = await searchParams;
+  const t = typeof sp.t === "string" ? sp.t : "";
   const secret = approvalSecret();
   const r = secret ? verifyApproval(t, secret) : null;
   if (!r || !r.ok) return (<main><h1>Approval</h1><p>This approval link is invalid or expired.</p></main>);
@@ -19,6 +20,7 @@ export default async function ApprovePage({ searchParams }: { searchParams: Prom
         <dt>Link expires</dt><dd>{r.expiresAt.toISOString().replace("T", " ").slice(0, 16)} UTC</dd>
       </dl>
       <ApproveForm token={t} />
+      <p><small>In a real deployment this page sits behind your company login and records who approved.</small></p>
       <p><small>Demo data, fictional company.</small></p>
     </main>
   );

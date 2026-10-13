@@ -72,7 +72,7 @@ export function getDataset(now: Date) {
     if (status !== "cancelled" && status !== "processing") {
       const amountCents = lines.reduce((s, l) => s + l.qty * l.unitCents, 0);
       const dueAt = new Date(createdAt.getTime() + 30 * DAY);
-      const paid = rand() < 0.6 && daysAgo > 10;
+      const paid = rand() < 0.6 && daysAgo >= 12;
       invoices.push({
         id: `INV-${id}`, orderId: id, customerId: customer.id, issuedAt: createdAt, dueAt, amountCents,
         paidAt: paid ? new Date(createdAt.getTime() + 12 * DAY) : null,

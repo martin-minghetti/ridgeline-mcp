@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 const REPO = "https://github.com/martin-minghetti/ridgeline-mcp";
 export default function Home() {
   const url = `${process.env.PUBLIC_BASE_URL ?? ""}/api/mcp`;
